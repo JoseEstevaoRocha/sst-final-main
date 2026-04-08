@@ -1,0 +1,176 @@
+<?php
+namespace App\Http\Controllers;
+use Illuminate\Http\Request;
+use App\Models\{Colaborador, ASO, EPI, EPIEstoque, EntregaEPI, EntregaUniforme, Extintor, Maquina, WhatsappMensagem, Setor, Funcao, Empresa};
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
+class DashboardController extends Controller {
+    public function index() {
+        $user = auth()->user();
+        $eid  = $user->isSuperAdmin() ? null : $user->empresa_id;
+        $cW   = $eid ? ['empresa_id' => $eid] : [];
+        $hoje = today();
+        $em30 = today()->addDays(30);
+
+        // ── EMPRESA ──────────────────────────────────────────────────
+        $empresa = $eid ? Empresa::find($eid) : null;
+
+        // ── COLABORADORES ─────────────────────────────────────────────
+        $totalAtivos     = Colaborador::where($cW)->where('status', 'Contratado')->count();
+        $totalAfastados  = Colaborador::where($cW)->where('status', 'Afastado')->count();
+        $totalDemitidos  = Colaborador::where($cW)->where('status', 'Demitido')->count();
+
+        // Admissões e demissões nos últimos 30 dias
+        $admissoesRecentes = Colaborador::where($cW)
+            ->where('data_admissao', '>=', $hoje->copy()->subDays(30))
+            ->count();
+        $demissoesRecentes = Colaborador::where($cW)
+            ->where('data_demissao', '>=', $hoje->copy()->subDays(30))
+            ->count();
+
+        // Por setor
+        $porSetor = DB::table('colaboradores')
+            ->join('setores', 'colaboradores.setor_id', '=', 'setores.id')
+            ->when($eid, fn($q) => $q->where('colaboradores.empresa_id', $eid))
+            ->where('colaboradores.status', 'Contratado')
+            ->whereNull('colaboradores.deleted_at')
+            ->selectRaw('setores.nome, COUNT(*) as total')
+            ->groupBy('setores.nome')
+            ->orderByDesc('total')
+            ->get();
+
+        // Por função
+        $porFuncao = DB::table('colaboradores')
+            ->join('funcoes', 'colaboradores.funcao_id', '=', 'funcoes.id')
+            ->when($eid, fn($q) => $q->where('colaboradores.empresa_id', $eid))
+            ->where('colaboradores.status', 'Contratado')
+            ->whereNull('colaboradores.deleted_at')
+            ->selectRaw('funcoes.nome, COUNT(*) as total')
+            ->groupBy('funcoes.nome')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->get();
+
+        // ── ASOs ──────────────────────────────────────────────────────
+        $asoTotal    = ASO::where($cW)->count();
+        $asoValidos  = ASO::where($cW)->where('data_vencimento', '>=', $hoje)->count();
+        $asoVencidos = ASO::where($cW)->where('data_vencimento', '<', $hoje)->count();
+        $asoAVencer  = ASO::where($cW)->whereBetween('data_vencimento', [$hoje, $em30])->count();
+        $asoConformidade = $asoTotal > 0 ? round(($asoValidos / $asoTotal) * 100, 1) : 100;
+
+        // Colaboradores sem ASO
+        $semAso = Colaborador::where($cW)->where('status', 'Contratado')
+            ->whereDoesntHave('asos')
+            ->count();
+
+        // ── RISCOS ────────────────────────────────────────────────────
+        $totalRiscos = DB::table('riscos')->count();
+        $riscosPorTipo = DB::table('riscos')
+            ->selectRaw('categoria, COUNT(*) as total')
+            ->groupBy('categoria')
+            ->get()
+            ->keyBy('categoria');
+
+        // GHEs por setor (setores com maior exposição)
+        $setoresRisco = DB::table('ghe_setores')
+            ->join('setores', 'ghe_setores.setor_id', '=', 'setores.id')
+            ->join('ghes', 'ghe_setores.ghe_id', '=', 'ghes.id')
+            ->join('ghe_riscos', 'ghes.id', '=', 'ghe_riscos.ghe_id')
+            ->when($eid, fn($q) => $q->where('ghes.empresa_id', $eid))
+            ->selectRaw('setores.nome, COUNT(ghe_riscos.id) as total_riscos')
+            ->groupBy('setores.nome')
+            ->orderByDesc('total_riscos')
+            ->limit(5)
+            ->get();
+
+        // ── CIPA ──────────────────────────────────────────────────────
+        $cipaAtiva = DB::table('cipa_membros')
+            ->when($eid, fn($q) => $q->where('empresa_id', $eid))
+            ->where('ativo', true)
+            ->where('mandato_fim', '>=', $hoje)
+            ->count();
+        $cipaMandatoVencido = DB::table('cipa_membros')
+            ->when($eid, fn($q) => $q->where('empresa_id', $eid))
+            ->where('ativo', true)
+            ->where('mandato_fim', '<', $hoje)
+            ->count();
+
+        // ── EPIs ──────────────────────────────────────────────────────
+        $epiVencidos    = EntregaEPI::where($cW)->where('status', 'Ativo')->where('data_prevista_troca', '<', $hoje)->count();
+        $epiAVencer     = EntregaEPI::where($cW)->where('status', 'Ativo')->whereBetween('data_prevista_troca', [$hoje, $em30])->count();
+        $epiEntregues   = EntregaEPI::where($cW)->count();
+        $estoquesBaixos = EPIEstoque::where($cW)->where('quantidade', '<=', 0)->count();
+
+        // ── EXTINTORES ────────────────────────────────────────────────
+        $extintVencidos = Extintor::where($cW)->where('proxima_recarga', '<', $hoje)->count();
+        $extintTotal    = Extintor::where($cW)->count();
+
+        // ── ALERTAS ───────────────────────────────────────────────────
+        $alertas = [];
+        if ($asoVencidos   > 0) $alertas[] = ['nivel'=>'danger',  'icon'=>'fa-clipboard-times', 'msg'=>"{$asoVencidos} ASO(s) VENCIDO(S) — risco de auto de infração", 'link'=>route('asos.vencidos')];
+        if ($semAso        > 0) $alertas[] = ['nivel'=>'danger',  'icon'=>'fa-user-slash',       'msg'=>"{$semAso} colaborador(es) SEM nenhum ASO cadastrado", 'link'=>route('asos.index')];
+        if ($asoAVencer    > 0) $alertas[] = ['nivel'=>'warning', 'icon'=>'fa-calendar-times',   'msg'=>"{$asoAVencer} ASO(s) vencendo nos próximos 30 dias", 'link'=>route('asos.a-vencer')];
+        if ($epiVencidos   > 0) $alertas[] = ['nivel'=>'danger',  'icon'=>'fa-hard-hat',         'msg'=>"{$epiVencidos} EPI(s) com prazo de troca vencido", 'link'=>route('epis.entregas')];
+        if ($extintVencidos> 0) $alertas[] = ['nivel'=>'danger',  'icon'=>'fa-fire-extinguisher','msg'=>"{$extintVencidos} extintor(es) com recarga vencida", 'link'=>route('extintores.index')];
+        if ($estoquesBaixos> 0) $alertas[] = ['nivel'=>'warning', 'icon'=>'fa-box-open',         'msg'=>"{$estoquesBaixos} EPI(s) com estoque zerado", 'link'=>route('epis.index')];
+        if ($cipaMandatoVencido > 0) $alertas[] = ['nivel'=>'warning','icon'=>'fa-users-cog',    'msg'=>"CIPA com mandato vencido — necessita renovação", 'link'=>route('cipa.index')];
+
+        // ── PRÓXIMOS ASOs ────────────────────────────────────────────
+        $proximosAsos = ASO::with(['colaborador.funcao', 'colaborador.empresa'])
+            ->where($cW)
+            ->where(fn($q) => $q->where('data_vencimento', '<', $hoje)->orWhereBetween('data_vencimento', [$hoje, $em30]))
+            ->where('data_vencimento', '>=', $hoje->copy()->subDays(60))
+            ->orderBy('data_vencimento')
+            ->limit(10)
+            ->get();
+
+        // ── TENDÊNCIA (últimos 6 meses) ───────────────────────────────
+        $tendencia = collect(range(5, 0))->map(function($i) use($cW) {
+            $mes = today()->subMonths($i);
+            return [
+                'mes'   => $mes->locale('pt_BR')->isoFormat('MMM/YY'),
+                'asos'  => ASO::where($cW)->whereYear('created_at', $mes->year)->whereMonth('created_at', $mes->month)->count(),
+                'admissoes' => Colaborador::where($cW)->whereYear('data_admissao', $mes->year)->whereMonth('data_admissao', $mes->month)->count(),
+            ];
+        });
+
+        // ── ADMISSÕES RECENTES ────────────────────────────────────────
+        $admissoesLista = Colaborador::with(['setor', 'funcao'])
+            ->where($cW)
+            ->where('data_admissao', '>=', $hoje->copy()->subDays(60))
+            ->orderByDesc('data_admissao')
+            ->limit(5)
+            ->get();
+
+        $empresas = $user->isSuperAdmin()
+            ? Empresa::ativas()->orderBy('razao_social')->get()
+            : collect();
+
+        return view('dashboard.index', compact(
+            'empresa', 'empresas',
+            'totalAtivos', 'totalAfastados', 'totalDemitidos',
+            'admissoesRecentes', 'demissoesRecentes',
+            'porSetor', 'porFuncao',
+            'asoTotal', 'asoValidos', 'asoVencidos', 'asoAVencer', 'asoConformidade', 'semAso',
+            'totalRiscos', 'riscosPorTipo', 'setoresRisco',
+            'cipaAtiva', 'cipaMandatoVencido',
+            'epiVencidos', 'epiAVencer', 'epiEntregues', 'estoquesBaixos',
+            'extintVencidos', 'extintTotal',
+            'alertas', 'proximosAsos', 'tendencia', 'admissoesLista'
+        ));
+    }
+
+    public function data(Request $r) {
+        return (new ApiController)->dashboardCharts($r);
+    }
+
+    public function alertas() {
+        $user = auth()->user();
+        $cW   = $user->isSuperAdmin() ? [] : ['empresa_id' => $user->empresa_id];
+        $hoje = today();
+        $alertas = ASO::with(['colaborador', 'colaborador.empresa'])
+            ->where($cW)->where('data_vencimento', '<', $hoje)->orderBy('data_vencimento')->limit(50)->get();
+        return view('dashboard.alertas', compact('alertas'));
+    }
+}
