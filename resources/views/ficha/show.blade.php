@@ -1,30 +1,30 @@
 @extends('layouts.app')
-@section('title','Ficha — '.$colab->nome)
+@section('title','Ficha — '.$colaborador->nome)
 @section('content')
 <div class="page-header">
     <div><h1 class="page-title">Ficha do Funcionário</h1></div>
     <div class="flex gap-8">
         <a href="{{ route('ficha.index') }}" class="btn btn-secondary">← Voltar</a>
-        <a href="{{ route('ficha.pdf',$colab->id) }}" class="btn btn-secondary"><i class="fas fa-file-pdf"></i> PDF</a>
-        <a href="{{ route('colaboradores.edit',$colab->id) }}" class="btn btn-primary"><i class="fas fa-pencil-alt"></i> Editar</a>
+        <a href="{{ route('ficha.pdf',$colaborador->id) }}" class="btn btn-secondary"><i class="fas fa-file-pdf"></i> PDF</a>
+        <a href="{{ route('colaboradores.edit',$colaborador->id) }}" class="btn btn-primary"><i class="fas fa-pencil-alt"></i> Editar</a>
     </div>
 </div>
 
 {{-- Header --}}
 <div class="card mb-20">
     <div class="flex align-center gap-20 mb-20">
-        <div class="avatar-xl">{{ $colab->initials }}</div>
+        <div class="avatar-xl">{{ $colaborador->initials }}</div>
         <div>
-            <h2 style="font-size:22px;font-weight:800">{{ $colab->nome }}</h2>
+            <h2 style="font-size:22px;font-weight:800">{{ $colaborador->nome }}</h2>
             <div class="flex flex-wrap gap-12 mt-8 text-13 text-muted">
-                <span><i class="fas fa-briefcase"></i> {{ $colab->funcao->nome??'—' }}</span>
-                <span><i class="fas fa-layer-group"></i> {{ $colab->setor->nome??'—' }}</span>
-                <span><i class="fas fa-building"></i> {{ $colab->empresa->nome_display??'—' }}</span>
+                <span><i class="fas fa-briefcase"></i> {{ $colaborador->funcao->nome??'—' }}</span>
+                <span><i class="fas fa-layer-group"></i> {{ $colaborador->setor->nome??'—' }}</span>
+                <span><i class="fas fa-building"></i> {{ $colaborador->empresa->nome_display??'—' }}</span>
             </div>
         </div>
     </div>
     <div class="ficha-grid">
-        @foreach([['CPF',$colab->cpf],['PIS',$colab->pis??'—'],['Matrícula',$colab->matricula??'—'],['eSocial',$colab->matricula_esocial??'—'],['CBO',$colab->cbo??'—'],['Nascimento',$colab->data_nascimento?->format('d/m/Y')??'—'],['Idade',$resumo['idadeAnos'].' anos'],['Sexo',$colab->sexo==='M'?'Masculino':'Feminino'],['Admissão',$colab->data_admissao?->format('d/m/Y')??'—'],['Tempo',$resumo['tempoMeses']<12?$resumo['tempoMeses'].'m':floor($resumo['tempoMeses']/12).'a '.($resumo['tempoMeses']%12).'m'],['Escolaridade',$colab->escolaridade??'—'],['Status',$colab->status]] as [$k,$v])
+        @foreach([['CPF',$colaborador->cpf],['PIS',$colaborador->pis??'—'],['Matrícula',$colaborador->matricula??'—'],['eSocial',$colaborador->matricula_esocial??'—'],['CBO',$colaborador->cbo??'—'],['Nascimento',$colaborador->data_nascimento?->format('d/m/Y')??'—'],['Idade',$resumo['idadeAnos'].' anos'],['Sexo',$colaborador->sexo==='M'?'Masculino':'Feminino'],['Admissão',$colaborador->data_admissao?->format('d/m/Y')??'—'],['Tempo',$resumo['tempoMeses']<12?$resumo['tempoMeses'].'m':floor($resumo['tempoMeses']/12).'a '.($resumo['tempoMeses']%12).'m'],['Escolaridade',$colaborador->escolaridade??'—'],['Status',$colaborador->status]] as [$k,$v])
         <div class="ficha-dado"><div class="ficha-label">{{ $k }}</div><div class="ficha-val">{{ $v }}</div></div>
         @endforeach
     </div>
@@ -71,7 +71,7 @@
 {{-- Uniforme --}}
 <div id="tab-uni" class="tc">
 <div class="card mb-16" style="border-left:3px solid var(--brand)">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--brand)">{{ $colab->empresa->razao_social??'' }}</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--brand)">{{ $colaborador->empresa->razao_social??'' }}</div>
     <div style="font-size:17px;font-weight:800;margin-top:2px">Termo de Responsabilidade — Uniforme</div>
     <div style="font-size:12px;color:var(--text-2);margin-top:8px;line-height:1.7;font-style:italic">Declaro ter recebido da empresa os uniformes abaixo relacionados, comprometendo-me a mantê-los em bom estado de conservação e limpeza.</div>
 </div>

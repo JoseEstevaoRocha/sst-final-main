@@ -9,7 +9,7 @@ use App\Http\Controllers\{
     ExtintorController, BrigadaController, CipaController,
     WhatsAppController, ClinicaController, FichaController,
     ImportacaoController, RelatorioController, ConfigController,
-    ApiController, ExameClinicoController
+    ApiController, ExameClinicoController, MedicoController
 };
 
 // ── AUTENTICAÇÃO ─────────────────────────────────────────────────────────
@@ -106,6 +106,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::middleware('permission:uniformes.view')->group(function () {
         Route::get('/uniformes/entregas',    [UniformeController::class, 'entregas'])->name('uniformes.entregas');
         Route::post('/uniformes/entregas',   [UniformeController::class, 'storeEntrega'])->name('uniformes.entregas.store');
+        Route::get('/uniformes/grade',       [UniformeController::class, 'grade'])->name('uniformes.grade');
         Route::get('/uniformes/ficha/{colaborador}',[UniformeController::class,'ficha'])->name('uniformes.ficha');
         Route::resource('uniformes', UniformeController::class);
         Route::post('/uniformes/{uniforme}/estoque', [UniformeController::class, 'updateEstoque'])->name('uniformes.estoque');
@@ -171,6 +172,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('/configuracoes/usuarios',[ConfigController::class, 'storeUsuario'])->name('config.usuarios.store')->middleware('permission:users.create');
         Route::put('/configuracoes/usuarios/{user}',[ConfigController::class, 'updateUsuario'])->name('config.usuarios.update')->middleware('permission:users.edit');
         Route::delete('/configuracoes/usuarios/{user}',[ConfigController::class, 'destroyUsuario'])->name('config.usuarios.destroy')->middleware('permission:users.delete');
+
+        // ── Médicos ────────────────────────────────────────────────
+        Route::get('/configuracoes/medicos',           [MedicoController::class, 'index'])->name('medicos.index');
+        Route::post('/configuracoes/medicos',          [MedicoController::class, 'store'])->name('medicos.store');
+        Route::put('/configuracoes/medicos/{medico}',  [MedicoController::class, 'update'])->name('medicos.update');
+        Route::delete('/configuracoes/medicos/{medico}',[MedicoController::class,'destroy'])->name('medicos.destroy');
     });
 
     // ── API AJAX ──────────────────────────────────────────────────

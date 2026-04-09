@@ -147,6 +147,39 @@ class DashboardController extends Controller {
             ? Empresa::ativas()->orderBy('razao_social')->get()
             : collect();
 
+        // ── ABA: DADOS DA EMPRESA ─────────────────────────────────────
+        $homens   = Colaborador::where($cW)->where('status','Contratado')->where('sexo','M')->count();
+        $mulheres = Colaborador::where($cW)->where('status','Contratado')->where('sexo','F')->count();
+
+        $colaboradoresComIdade = Colaborador::where($cW)->where('status','Contratado')
+            ->whereNotNull('data_nascimento')->get(['nome','data_nascimento']);
+
+        $idades = $colaboradoresComIdade->map(fn($c) => $c->data_nascimento->age);
+        $mediaIdade = $idades->count() ? round($idades->avg(), 1) : null;
+
+        $maisJovem = $colaboradoresComIdade->sortByDesc('data_nascimento')->first();
+        $maisVelho = $colaboradoresComIdade->sortBy('data_nascimento')->first();
+
+        $faixaEtaria = ['18–25' => 0, '26–35' => 0, '36–45' => 0, '46–55' => 0, '56+' => 0];
+        foreach ($idades as $idade) {
+            if      ($idade <= 25) $faixaEtaria['18–25']++;
+            elseif  ($idade <= 35) $faixaEtaria['26–35']++;
+            elseif  ($idade <= 45) $faixaEtaria['36–45']++;
+            elseif  ($idade <= 55) $faixaEtaria['46–55']++;
+            else                   $faixaEtaria['56+']++;
+        }
+
+        $tempoEmpresa = ['< 1 ano' => 0, '1–3 anos' => 0, '3–5 anos' => 0, '5+ anos' => 0];
+        Colaborador::where($cW)->where('status','Contratado')
+            ->whereNotNull('data_admissao')->get(['data_admissao'])
+            ->each(function($c) use (&$tempoEmpresa, $hoje) {
+                $anos = $c->data_admissao->diffInYears($hoje);
+                if      ($anos < 1) $tempoEmpresa['< 1 ano']++;
+                elseif  ($anos < 3) $tempoEmpresa['1–3 anos']++;
+                elseif  ($anos < 5) $tempoEmpresa['3–5 anos']++;
+                else                $tempoEmpresa['5+ anos']++;
+            });
+
         return view('dashboard.index', compact(
             'empresa', 'empresas',
             'totalAtivos', 'totalAfastados', 'totalDemitidos',
@@ -157,7 +190,9 @@ class DashboardController extends Controller {
             'cipaAtiva', 'cipaMandatoVencido',
             'epiVencidos', 'epiAVencer', 'epiEntregues', 'estoquesBaixos',
             'extintVencidos', 'extintTotal',
-            'alertas', 'proximosAsos', 'tendencia', 'admissoesLista'
+            'alertas', 'proximosAsos', 'tendencia', 'admissoesLista',
+            'homens', 'mulheres', 'mediaIdade', 'maisJovem', 'maisVelho',
+            'faixaEtaria', 'tempoEmpresa'
         ));
     }
 

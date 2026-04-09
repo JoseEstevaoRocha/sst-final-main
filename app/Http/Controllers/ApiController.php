@@ -11,15 +11,26 @@ class ApiController extends Controller {
     }
 
     public function funcoes(Request $r): JsonResponse {
-        $q = Funcao::orderBy('nome')->select('id','nome');
+        $q = Funcao::orderBy('nome')->select('id','nome','cbo','periodicidade_aso_dias');
         if ($r->setor_id)   $q->where('setor_id',  $r->setor_id);
         if ($r->empresa_id) $q->where('empresa_id',$r->empresa_id);
         return response()->json($q->get());
     }
 
     public function colaboradores(Request $r): JsonResponse {
-        $empresaId = $r->empresa_id ?? auth()->user()->empresa_id;
-        return response()->json(Colaborador::where('empresa_id',$empresaId)->where('status','Contratado')->orderBy('nome')->select('id','nome','cpf')->get());
+        $q = Colaborador::with(['setor:id,nome','funcao:id,nome'])
+            ->where('status','Contratado')
+            ->orderBy('nome');
+        $empresaId = $r->empresa_id ?? (!auth()->user()->isSuperAdmin() ? auth()->user()->empresa_id : null);
+        if ($empresaId) $q->where('empresa_id', $empresaId);
+        if ($r->nome)   $q->where('nome','ilike',"%{$r->nome}%");
+        return response()->json($q->limit(30)->get()->map(fn($c) => [
+            'id'     => $c->id,
+            'nome'   => $c->nome,
+            'cpf'    => $c->cpf,
+            'setor'  => $c->setor->nome ?? null,
+            'funcao' => $c->funcao->nome ?? null,
+        ]));
     }
 
     public function maquinas(Request $r): JsonResponse {

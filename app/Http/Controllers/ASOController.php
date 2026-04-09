@@ -7,31 +7,50 @@ use Carbon\Carbon;
 class ASOController extends Controller {
 
     public function index(Request $r) {
-        $hoje = today(); $em30 = today()->addDays(30);
-        $user = auth()->user();
-        $cW   = $user->isSuperAdmin() ? [] : ['empresa_id' => $user->empresa_id];
+        $hoje  = today();
+        $em40  = today()->addDays(40);
+        $user  = auth()->user();
+        $cW    = $user->isSuperAdmin() ? [] : ['empresa_id' => $user->empresa_id];
 
         $q = ASO::with(['colaborador.funcao','colaborador.setor','empresa','clinica'])->where($cW);
-        if ($r->search)    $q->whereHas('colaborador',fn($sq)=>$sq->where('nome','ilike',"%{$r->search}%"));
-        if ($r->tipo)      $q->where('tipo',$r->tipo);
-        if ($r->status)    $q->where('status_logistico',$r->status);
-        if ($r->resultado) $q->where('resultado',$r->resultado);
-        $asos  = $q->orderBy('data_vencimento')->paginate(20)->withQueryString();
+
+        if ($r->search)     $q->whereHas('colaborador', fn($sq) => $sq
+            ->where('nome','ilike',"%{$r->search}%")
+            ->orWhere('cpf','ilike',"%{$r->search}%")
+        );
+        if ($r->empresa_id) $q->where('empresa_id', $r->empresa_id);
+        if ($r->tipo)       $q->where('tipo',        $r->tipo);
+        if ($r->status)     $q->where('status_logistico', $r->status);
+        if ($r->resultado)  $q->where('resultado',   $r->resultado);
+        if ($r->mes)        $q->whereMonth('data_vencimento', $r->mes);
+
+        // Filtro por situação
+        match($r->situacao) {
+            'vencidos'    => $q->where('data_vencimento','<', $hoje),
+            'a_vencer_40' => $q->whereBetween('data_vencimento', [$hoje, $em40]),
+            'em_dia'      => $q->where('data_vencimento','>', $em40),
+            'agendados'   => $q->where('status_logistico','agendado'),
+            default       => null,
+        };
+
+        $asos  = $q->orderBy('data_vencimento')->paginate(25)->withQueryString();
         $stats = [
-            'total'     => ASO::where($cW)->count(),
-            'vencidos'  => ASO::where($cW)->where('data_vencimento','<',$hoje)->count(),
-            'a_vencer'  => ASO::where($cW)->whereBetween('data_vencimento',[$hoje,$em30])->count(),
-            'agendados' => ASO::where($cW)->where('status_logistico','agendado')->count(),
-            'em_dia'    => ASO::where($cW)->where('data_vencimento','>=',$hoje)->count(),
+            'total'       => ASO::where($cW)->count(),
+            'vencidos'    => ASO::where($cW)->where('data_vencimento','<',$hoje)->count(),
+            'a_vencer_40' => ASO::where($cW)->whereBetween('data_vencimento',[$hoje,$em40])->count(),
+            'agendados'   => ASO::where($cW)->where('status_logistico','agendado')->count(),
+            'em_dia'      => ASO::where($cW)->where('data_vencimento','>',$em40)->count(),
         ];
         $empresas = $user->isSuperAdmin() ? Empresa::ativas()->get() : collect();
-        return view('aso.index',compact('asos','stats','empresas'));
+        $clinicas = Clinica::ativas()->orderBy('nome')->get();
+        return view('aso.index', compact('asos','stats','empresas','clinicas'));
     }
 
-    public function create() {
-        $clinicas = Clinica::ativas()->orderBy('nome')->get();
-        $empresas = auth()->user()->isSuperAdmin() ? Empresa::ativas()->get() : collect([auth()->user()->empresa]);
-        return view('aso.form',['aso'=>null,'clinicas'=>$clinicas,'empresas'=>$empresas]);
+    public function create(Request $r) {
+        $clinicas       = Clinica::ativas()->orderBy('nome')->get();
+        $empresas       = auth()->user()->isSuperAdmin() ? Empresa::ativas()->get() : collect([auth()->user()->empresa]);
+        $preColaborador = $r->colaborador_id ? Colaborador::with(['empresa','funcao','setor'])->find($r->colaborador_id) : null;
+        return view('aso.form', ['aso'=>null, 'clinicas'=>$clinicas, 'empresas'=>$empresas, 'preColaborador'=>$preColaborador]);
     }
 
     public function store(Request $r) {

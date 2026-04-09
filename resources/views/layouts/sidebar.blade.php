@@ -29,14 +29,13 @@ $nav = [
     ]],
     ['id'=>'saude','label'=>'Saúde Ocupacional','icon'=>'fas fa-heartbeat','match'=>['asos*','clinicas*','exames-clinicos*'],'sub'=>[
         ['href'=>route('asos.index'),'icon'=>'fas fa-clipboard-list','label'=>'Gestão de ASO'],
-        ['href'=>route('asos.vencidos'),'icon'=>'fas fa-calendar-times','label'=>'ASOs Vencidos'],
-        ['href'=>route('asos.a-vencer'),'icon'=>'fas fa-clock','label'=>'A Vencer (30d)'],
-        ['href'=>route('asos.agendamento'),'icon'=>'fas fa-calendar-plus','label'=>'Agendamento'],
+        ['href'=>route('asos.relatorio-clinica'),'icon'=>'fas fa-file-medical','label'=>'Relatório Clínica'],
         ['href'=>route('clinicas.index'),'icon'=>'fas fa-hospital','label'=>'Clínicas'],
         ['href'=>route('exames-clinicos.index'),'icon'=>'fas fa-stethoscope','label'=>'Exames Clínicos'],
     ]],
     ['id'=>'uniformes','label'=>'Uniformes','icon'=>'fas fa-tshirt','match'=>['uniformes*','tamanhos*'],'sub'=>[
         ['href'=>route('uniformes.index'),'icon'=>'fas fa-tshirt','label'=>'Catálogo'],
+        ['href'=>route('uniformes.grade'),'icon'=>'fas fa-table','label'=>'Consulta de Grade'],
         ['href'=>route('tamanhos.index'),'icon'=>'fas fa-ruler','label'=>'Tamanhos'],
         ['href'=>route('uniformes.entregas'),'icon'=>'fas fa-box-open','label'=>'Entregas'],
     ]],
@@ -69,9 +68,10 @@ $nav = [
         ['href'=>route('relatorios.asos'),'icon'=>'fas fa-clipboard-list','label'=>'Relatório ASOs'],
         ['href'=>route('relatorios.epis'),'icon'=>'fas fa-hard-hat','label'=>'Relatório EPIs'],
     ]],
-    ['id'=>'config','label'=>'Configurações','icon'=>'fas fa-cog','match'=>['config*'],'sub'=>[
+    ['id'=>'config','label'=>'Configurações','icon'=>'fas fa-cog','match'=>['config*','medicos*'],'sub'=>[
         ['href'=>route('config.index'),'icon'=>'fas fa-sliders-h','label'=>'Sistema'],
         ['href'=>route('config.usuarios'),'icon'=>'fas fa-user-cog','label'=>'Usuários'],
+        ['href'=>route('medicos.index'),'icon'=>'fas fa-user-md','label'=>'Médicos do Trabalho'],
     ]],
 ];
 @endphp
